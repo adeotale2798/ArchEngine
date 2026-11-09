@@ -1,0 +1,103 @@
+{
+  "theme_strategy": "Toggleable Light/Dark Mode. The app employs an 'Architectural Brutalism meets Warm Earth' aesthetic. Light mode provides an earthy, trustworthy, and organic vibe for clients (using concrete, warm sand, terracotta). Dark mode shifts to a 'Blueprint/Tactical' aesthetic for the admin dashboard, focusing on density and high contrast for technical precision.",
+  "typography": {
+    "font_imports": "@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700;800&display=swap');",
+    "headings": "Outfit, sans-serif. Used for all H1-H4, package titles, and hero sections. Apply tracking-tight for sizes > text-2xl.",
+    "body": "IBM Plex Sans, sans-serif. Used for standard paragraphs, labels, UI text. Clean and readable.",
+    "monospace": "IBM Plex Mono, monospace. CRITICAL for numbers, INR amounts, GST calculations, rule builder previews, and audit logs. Ensures vertical alignment of data.",
+    "hierarchy_rules": "H1 max text-5xl on desktop, H2 text-3xl, H3 text-xl. Massive gaps between sections. Never use 'Inter'."
+  },
+  "colors": {
+    "css_variables_light": {
+      "--background": "40 20% 97%",
+      "--foreground": "20 14% 15%",
+      "--primary": "20 80% 50%", 
+      "--primary-foreground": "0 0% 100%",
+      "--secondary": "215 25% 27%",
+      "--secondary-foreground": "0 0% 100%",
+      "--muted": "40 10% 90%",
+      "--muted-foreground": "20 14% 40%",
+      "--border": "40 10% 85%",
+      "--card": "0 0% 100%",
+      "--card-foreground": "20 14% 15%"
+    },
+    "css_variables_dark": {
+      "--background": "215 25% 10%",
+      "--foreground": "215 20% 95%",
+      "--primary": "20 80% 60%",
+      "--primary-foreground": "0 0% 100%",
+      "--secondary": "215 25% 20%",
+      "--secondary-foreground": "215 20% 95%",
+      "--muted": "215 20% 15%",
+      "--muted-foreground": "215 20% 65%",
+      "--border": "215 20% 20%",
+      "--card": "215 25% 12%",
+      "--card-foreground": "215 20% 95%"
+    },
+    "guidelines": "Primary is a warm Terracotta (brick orange) for action items. Secondary is Blueprint Navy for structural UI. Never use standard SaaS Blue. Accentuate with crisp 1px borders."
+  },
+  "grids_and_layouts": {
+    "admin_dashboard": "High Density Grid. Left sidebar (w-64), sticky top header. Data tables use border-collapse with tight p-2 spacing. Matrix editors (bands/slabs) utilize CSS Grid with sticky first columns.",
+    "client_wizard": "Bento Grid Protocol. Max-w-5xl container, centered, huge padding (p-12). Forms and package cards must have generous breathing room. Asymmetric layouts for the Intro/Brief step to feel like an editorial magazine.",
+    "spacing": "Use 2-3x more spacing. Containers with borders MUST have p-6 or p-8 internal padding. Use gap-8 or gap-12 between wizard sections."
+  },
+  "visual_enhancers": {
+    "surfaces": "Client Wizard uses 'Neumorphic Tactile' cards (soft ambient shadow, sharp 1px inner border). Admin dashboard uses 'Grid Borders' (flat background, exposed 1px skeleton, no shadows).",
+    "glassmorphism": "Use backdrop-blur-xl bg-background/90 for sticky headers and live cost summary dock. NEVER use a completely transparent background for sticky headers or dropdowns.",
+    "empty_states": "Use Lucide React icons with large, muted strokes and a dashed border container to indicate drop zones or missing rules."
+  },
+  "component_patterns": {
+    "buttons": "Hand-written. Base: inline-flex items-center justify-center font-semibold transition-colors focus:ring-2 focus:ring-primary/50 disabled:opacity-50. Primary: bg-primary text-primary-foreground hover:brightness-110 rounded-md. Ghost: hover:bg-muted rounded-md.",
+    "inputs_and_forms": "Hand-written. Floating labels or top labels. Input base: flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary.",
+    "data_tables": "Hand-written. Use w-full text-left border-collapse. th: border-b border-border p-3 font-medium text-muted-foreground. td: p-3 border-b border-border. Use monospace for rates/quantities.",
+    "tabbed_editor": "Hand-written. Flex row with overflow-x-auto gap-2 border-b border-border mb-4. Tab item: px-4 py-2 text-sm border-b-2 transition-colors. Active: border-primary text-primary, Inactive: border-transparent text-muted-foreground.",
+    "rule_builder": "Tree UI built with nested divs. Use border-l-2 border-primary/20 pl-4 ml-2 for child nodes. Nodes have a hoverable card layout containing human-readable equation logic.",
+    "package_cards": "Use 'group' class for hover. Image on top (h-48 object-cover). Card body p-6. Action button reveals or translates up on group-hover. Include 'Recommended' badge absolute top-right."
+  },
+  "images": {
+    "login_hero": {
+      "url": "https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmUlMjBidWlsZGluZyUyMGZhY2FkZXxlbnwwfHx8fDE3OTQyMjgwNDl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "White modern cement building facade. Use as a half-screen hero image on the login page with a dark overlay."
+    },
+    "client_intro": {
+      "url": "https://images.unsplash.com/photo-1603901622056-0a5bee231395?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHwzfHxhcmNoaXRlY3R1cmFsJTIwYmx1ZXByaW50cyUyMGRlc2t8ZW58MHx8fHwxNzk0MjI4MDQ5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Architectural blueprints desk. Use in the client welcome screen or wizard introduction."
+    },
+    "package_civil_premium": {
+      "url": "https://images.unsplash.com/photo-1756706718604-ef4af3970e33?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBjb25jcmV0ZSUyMGhvdXNlJTIwZXh0ZXJpb3J8ZW58MHx8fHwxNzk0MjI4MDQ5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern concrete and wood house. Use for 'Premium' or 'Turnkey' package selection cards."
+    },
+    "package_basic": {
+      "url": "https://images.unsplash.com/photo-1625337904562-efe0a0d9793f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwzfHxicmljayUyMGNvbnN0cnVjdGlvbiUyMHNpdGV8ZW58MHx8fHwxNzk0MjI4MDQ5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Red brick wall construction site. Use for 'Basic' or 'Civil Only' package selection cards."
+    }
+  },
+  "motion": {
+    "hover_states": "All buttons and interactive cards must have hover:bg-muted or hover:-translate-y-1 transition-all duration-200.",
+    "wizard_transitions": "Use simple opacity and transform transitions when switching wizard steps. Avoid overly bouncy physics.",
+    "live_summary": "When GST or totals update, apply a brief text highlight or flash using animate-pulse to draw the client's attention."
+  },
+  "accessibility": {
+    "contrast": "Ensure IBM Plex Mono text over background passes AA standard. If using dark mode, text-muted-foreground must be light enough.",
+    "forms": "All inputs must have associated labels (no relying solely on placeholders). Focus rings are MANDATORY.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='package-select-btn', data-testid='total-cost-value')."
+  },
+  "instructions_to_main_agent": [
+    "No shadcn/ui is installed. You MUST build all components (buttons, inputs, tables, tabs, modals) from scratch using standard HTML elements and Tailwind CSS in .js or .jsx files.",
+    "The application relies on .js/.jsx extensions for components, NOT .tsx. Generate standard React JS.",
+    "Use Lucide-react for all iconography.",
+    "The admin dashboard must prioritize data density and quick editing. Build robust controlled forms for the rule builder and band matrix.",
+    "The client wizard must prioritize emotion, ease of understanding, and transparency. Use the provided package images to make options tangible.",
+    "Implement the live cost summary as a sticky sidebar or sticky footer in the client wizard, ensuring GST and contingencies are clearly separated."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Make creative, distinctive frontends that surprise and delight.",
+    "Create depth through layered design elements with z-index hierarchy and crisp 1px borders.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons. Use lucide-react.",
+    "Always apply modern interaction animations and explicitly set hover/active states.",
+    "Avoid the 'Center-Everything' disease. Use asymmetrical grids where appropriate.",
+    "Data Test IDs (data-testid) are strictly required for all interactive elements to support automated testing.",
+    "DO NOT use a complete transparent background for overlay elements (dropdowns, headers, tooltips)."
+  ]
+}

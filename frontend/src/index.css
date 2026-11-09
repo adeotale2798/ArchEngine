@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 40 20% 97%;
+  --foreground: 20 14% 15%;
+  --primary: 18 65% 47%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 24%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 40 14% 91%;
+  --muted-foreground: 20 10% 38%;
+  --border: 40 12% 84%;
+  --card: 0 0% 100%;
+  --success: 150 45% 34%;
+  --warning: 38 90% 42%;
+  --danger: 0 65% 46%;
+}
+
+body { @apply bg-background text-foreground font-sans antialiased; }
+h1, h2, h3, h4 { @apply font-display tracking-tight; }
+::selection { background: hsl(var(--primary) / .25); }
+.num { @apply font-mono tabular-nums; }
+.grain { background-image: radial-gradient(hsl(var(--foreground) / .05) 1px, transparent 1px); background-size: 14px 14px; }
+.blueprint { background-color: hsl(var(--secondary)); background-image: linear-gradient(hsl(0 0% 100% / .06) 1px, transparent 1px), linear-gradient(90deg, hsl(0 0% 100% / .06) 1px, transparent 1px); background-size: 28px 28px; }
+:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
