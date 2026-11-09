@@ -5,3 +5,10 @@ __pycache__/
 .pytest_cache/
 backups/
 *.archive.gz
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
