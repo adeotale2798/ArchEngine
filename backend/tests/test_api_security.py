@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 API = os.environ.get("TEST_API_URL", "http://localhost:8001/api")
-ARCH = ("architect@terraindstudio.com", "Architect@2026")
+ARCH = ("architect@studioeleven.in", "Studioeleven@2026")
 TENB = ("admin@tenantb-demo.com", "TenantB@2026")
 
 

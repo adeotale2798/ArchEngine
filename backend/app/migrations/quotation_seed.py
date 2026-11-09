@@ -110,7 +110,7 @@ async def seed_quotation(org_id, units, actor_id):
     if await db.estimate_templates.find_one({"organisation_id": org_id, "source_file": SRC}):
         return
     tid = new_id()
-    await db.estimate_templates.insert_one(doc(org_id, id=tid, name="Residential Turnkey Estimate (Terrain Design Studio)", source_file=SRC,
+    await db.estimate_templates.insert_one(doc(org_id, id=tid, name="Residential Turnkey Estimate", source_file=SRC,
         description="Imported from the Aniket Deotale quotation (06-05-2025). AWAITING ARCHITECT VERIFICATION before publishing.",
         intro_text="Tell us about your building — just the number of floors and bathrooms. Pick a package, review specifications and download your estimate. No measurements or drawings needed.",
         hero_image_url="https://images.unsplash.com/photo-1603901622056-0a5bee231395?w=1600&q=70", assumptions=ASSUMPTIONS,

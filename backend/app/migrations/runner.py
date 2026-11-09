@@ -35,14 +35,14 @@ async def m0001_indexes():
 
 async def m0002_platform_seed():
     sa = await ensure_user(os.environ["SUPERADMIN_EMAIL"].lower(), os.environ["SUPERADMIN_PASSWORD"], "Platform Super Admin", super_admin=True)
-    org = await create_org("Terrain Design Studio", os.environ["ARCHITECT_EMAIL"].lower(), os.environ["ARCHITECT_PASSWORD"], "Ar. Pankaj Kriplani",
-                           branding={"tagline": "architects & interior designers", "address": "A4, First Floor, Khullar Apartment, Byramji Town, Nagpur-440013",
-                                     "phone": "+91 8087088948", "email": "prk@terraindstudio.com", "primary_color": "#C2562B"}, slug="terrain")
+    org = await create_org("Studioeleven", os.environ["ARCHITECT_EMAIL"].lower(), os.environ["ARCHITECT_PASSWORD"], "Studioeleven Architect",
+                           branding={"tagline": "architects & interior designers", "email": os.environ["ARCHITECT_EMAIL"].lower(),
+                                     "primary_color": "#C2562B"}, slug="studioeleven")
     await ensure_membership(org["id"], sa, "org_admin")
 
 
 async def m0003_quotation_import():
-    org = await db.organisations.find_one({"slug": "terrain"})
+    org = await db.organisations.find_one({"slug": "studioeleven"})
     units = {u["code"]: u["id"] async for u in db.unit_definitions.find({"organisation_id": org["id"]})}
     await seed_quotation(org["id"], units, org.get("id"))
 
