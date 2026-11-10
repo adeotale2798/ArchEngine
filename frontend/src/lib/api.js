@@ -1,7 +1,9 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-export const BASE = import.meta.env.REACT_APP_BACKEND_URL;
+const backendUrl = (import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
+
+export const BASE = backendUrl;
 export const api = axios.create({ baseURL: `${BASE}/api` });
 
 api.interceptors.request.use((cfg) => {
@@ -30,7 +32,17 @@ export function errMsg(e) {
   return d.message || JSON.stringify(d);
 }
 
-export const notifyError = (e) => toast.error(errMsg(e));
+const shouldSilenceError = (e, message) => {
+  const status = e?.response?.status;
+  if (status !== 403) return false;
+  return /(permission for this action|not enabled|not allowed|access denied|disabled)/i.test(message);
+};
+
+export const notifyError = (e) => {
+  const message = errMsg(e);
+  if (shouldSilenceError(e, message)) return;
+  toast.error(message);
+};
 
 export async function download(path, filename) {
   try {

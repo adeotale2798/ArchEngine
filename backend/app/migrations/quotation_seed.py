@@ -121,7 +121,13 @@ async def seed_quotation(org_id, units, actor_id):
           help_text="Count every storey that has a roof slab above it, starting with the ground floor (e.g. G+3 = 4). Do not count the terrace, stilt or basement. Configure this definition to match your firm's convention.",
           client_visible=True, client_editable=True, sort_order=10),
         T(key="total_bathrooms", label="Total number of bathrooms", input_type="integer", required=True, default_value="2", min_value="0", max_value="20",
-          help_text="Count every toilet/bathroom in the building, including attached and common toilets.", client_visible=True, client_editable=True, sort_order=20)])
+                    help_text="Count every toilet/bathroom in the building, including attached and common toilets.", client_visible=True, client_editable=True, sort_order=20),
+                T(key="plinth_area_sqft", label="Plinth level area", input_type="decimal", required=False, default_value="", min_value="0", max_value="1000000",
+                    help_text="Measured plinth slab area in square feet. Used by the plinth/foundation rate calculation.", client_visible=False, client_editable=False, sort_order=30),
+                T(key="ground_floor_area_sqft", label="Ground floor slab area", input_type="decimal", required=False, default_value="", min_value="0", max_value="1000000",
+                    help_text="Measured ground-floor roof slab area in square feet.", client_visible=False, client_editable=False, sort_order=40),
+                T(key="typical_floor_area_sqft", label="Area per upper-floor slab", input_type="decimal", required=False, default_value="", min_value="0", max_value="1000000",
+                    help_text="Area in square feet used for each upper-floor roof slab.", client_visible=False, client_editable=False, sort_order=50)])
     pkg_ids = []
     for i, (code, name, desc) in enumerate(PACKAGES):
         p = T(code=code, name=name, description=desc, sort_order=(i + 1) * 10, is_recommended=code == "TYPE_B",
@@ -146,7 +152,8 @@ async def seed_quotation(org_id, units, actor_id):
         sec = ext_sec if code >= "FIN-05" else fin_sec
         line = T(section_id=sec, code=code, name=name, description=desc, unit_id=units["sft"], quantity_mode=mode,
                  fixed_quantity=area if mode == "FIXED_QUANTITY" else None, inclusion_default="INCLUDED", client_visible=True,
-                 client_can_change_option=False, client_price_visibility="SHOW_RATE", is_assumption=code in ("FIN-02", "FIN-04"),
+                 quantity_input_key="ground_floor_area_sqft" if code == "FIN-02" else None,
+                 client_can_change_option=True, client_price_visibility="SHOW_RATE", is_assumption=code in ("FIN-02", "FIN-04"),
                  source_ref=f"{SRC} — {ref}", sort_order=order,
                  internal_notes="Unit 'sft' copied from the printed column header '(sft)'." + (" VERIFY UNIT: value 10000 looks like litres." if code == "FIN-06" else "")
                  + (" VERIFY UNIT: likely running feet." if code in ("FIN-07", "FIN-08") else ""))
@@ -161,6 +168,7 @@ async def seed_quotation(org_id, units, actor_id):
                               "message": f"{name}: printed amount {printed[pi]} ≠ {area} × {rates[pi]} = {calc}. Printed value preserved here; engine computes quantity × rate."})
         if mode == "FLOOR_BAND_LOOKUP":
             await db.foundation_rule_sets.insert_one(T(name="Plinth / foundation by total floors", line_item_id=line["id"], input_key="total_floors",
+                quantity_input_key="plinth_area_sqft",
                 approval_note="Source quotation covers a G+3 (4 floor) building only. Architect must add bands for other floor counts.",
                 bands=[{"id": new_id(), "label": "Source quotation basis (G+3)", "min_floors": "4", "max_floors": "4", "quantity": area,
                         "unit_id": units["sft"], "specification": "Open foundation as per structural drawing (proposed structure + one floor future provision)",
@@ -168,6 +176,7 @@ async def seed_quotation(org_id, units, actor_id):
                         "approval_reference": "", "requires_review": True, "status": "active"}]))
         if mode == "PER_FLOOR":
             await db.slab_rule_sets.insert_one(T(name="Upper floor roof slabs", line_item_id=line["id"], input_key="total_floors",
+                quantity_input_key="typical_floor_area_sqft",
                 included_floor_types="Roof slabs above ground floor up to the top occupied floor (ground floor roof and terrace slab are separate rows)",
                 floor_adjustment="-1", slabs_per_floor="1", quantity_basis="AREA", quantity_per_floor=area, unit_id=units["sft"], is_assumption=True,
                 counting_notes="Source rows 3–5 each 1290 sft for First/Second/Third floor roofs.",
@@ -190,7 +199,7 @@ async def seed_quotation(org_id, units, actor_id):
                 subs[sub_name] = s["id"]
             sub_id = subs[sub_name]
         line = T(section_id=sid, subsection_id=sub_id, code=f"SPEC-{sr:02d}", name=item, description=spec, quantity_mode="LUMP_SUM",
-                 unit_id=units["LS"], inclusion_default="INCLUDED_IN_RATE", client_visible=True, client_can_change_option=False,
+                 unit_id=units["LS"], inclusion_default="INCLUDED_IN_RATE", client_visible=True, client_can_change_option=True,
                  client_price_visibility="LINE_TOTAL_ONLY", source_ref=f"{SRC} — Specifications Sr.No {sr}", sort_order=sr * 10,
                  client_notes="Specification only — cost included in the floor-level rates.")
         await db.line_items.insert_one(line)

@@ -16,7 +16,7 @@ CONVERSIONS = [("sqm", "sft", "10.7639104"), ("m", "ft", "3.280839895"), ("ft", 
 
 DEFAULT_SETTINGS = {
     "currency": "INR", "currency_symbol": "₹", "rounding": {"decimals": 2, "mode": "line_half_up"},
-    "tax": {"enabled": True, "label": "GST", "rate": "18", "note": "Verify the applicable GST rate for your contract type."},
+    "tax": {"enabled": False, "label": "GST", "rate": "18", "note": "Verify the applicable GST rate for your contract type."},
     "contingency": {"enabled": False, "rate": ""}, "export_formats": ["pdf", "xlsx", "csv"], "estimate_validity_days": 30,
     "require_approval_before_issue": False, "terms": "",
     "disclaimer": ("This is an indicative cost estimate based on the building-level inputs provided and the organisation's configured "

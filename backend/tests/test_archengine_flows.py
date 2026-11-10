@@ -9,7 +9,7 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or os.environ.get("VITE_BACKEND_URL") or "http://127.0.0.1:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 RUN = uuid.uuid4().hex[:5].upper()
 S = {}  # shared state across ordered tests

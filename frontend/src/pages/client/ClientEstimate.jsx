@@ -32,8 +32,12 @@ export default function ClientEstimate({ kind }) {
     const my = ++seq.current;
     try {
       const { data: r } = await api.put(`${base}/config`, patch);
-      if (my === seq.current) { setPrevTotal(result?.totals?.grand_total); setResult(r.result); }
-      if (patch.inputs) api.get(base).then((x) => setData((d) => ({ ...d, package_totals: x.data.package_totals })));
+      if (my === seq.current) {
+        setPrevTotal(result?.totals?.grand_total);
+        setResult(r.result);
+        setData((current) => ({ ...current, package_totals: { ...current.package_totals,
+          [next.package_id]: { grand_total: r.result.totals.grand_total, complete: r.result.is_complete } } }));
+      }
     } catch (e) { notifyError(e); }
     if (my === seq.current) setBusy(false);
   };
@@ -44,7 +48,7 @@ export default function ClientEstimate({ kind }) {
     <div className="grain min-h-screen" data-testid="client-estimate">
       <EstimateWizard meta={{ org: data.org, template: data.template, number: data.estimate.number, title: data.estimate.title, revision: data.revision }}
         inputDefs={data.input_defs} packages={data.packages} packageTotals={data.package_totals} optionsByLine={data.options_by_line}
-        state={state} result={result} editable={data.permissions.editable} busy={busy} onUpdate={onUpdate} prevTotal={prevTotal}
+        state={state} result={result} editable={false} busy={busy} onUpdate={onUpdate} prevTotal={prevTotal}
         exportFormats={data.permissions.can_download ? data.export_formats : []}
         onDownload={(f) => download(`${base}/exports/${f}`, `${data.estimate.number}.${f}`)} />
     </div>

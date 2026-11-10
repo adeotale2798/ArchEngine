@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronRight, Plus, Search, Copy, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { api, notifyError } from "@/lib/api";
@@ -98,6 +99,7 @@ function Editor({ line, templateId, onSaved }) {
 
 export default function LineItems() {
   const { templateId } = useTemplate();
+  const [searchParams] = useSearchParams();
   const secs = useList("sections", { template_id: templateId });
   const subs = useList("subsections", { template_id: templateId });
   const lines = useList("line_items", { template_id: templateId });
@@ -105,6 +107,10 @@ export default function LineItems() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState({});
   const current = lines.rows.find((l) => l.id === sel);
+  useEffect(() => {
+    const requestedLine = searchParams.get("line");
+    if (requestedLine && lines.rows.some((line) => line.id === requestedLine)) setSel(requestedLine);
+  }, [lines.rows, searchParams]);
   const filtered = useMemo(() => lines.rows.filter((l) => !q || `${l.code} ${l.name}`.toLowerCase().includes(q.toLowerCase())), [lines.rows, q]);
   const add = async (section_id, subsection_id) => {
     const code = prompt("New line item code (unique, e.g. PLB-01)");

@@ -65,6 +65,7 @@ class LineItemIn(Base):
     quantity_mode: Optional[Literal[tuple(QTY_MODES)]] = None
     fixed_quantity: Num = None
     input_key: Optional[str] = None
+    quantity_input_key: Optional[str] = None
     factor: Num = None
     rule_id: Optional[str] = None
     inclusion_default: Optional[Literal[tuple(INCLUSIONS)]] = None
@@ -161,6 +162,7 @@ class FoundationRuleSetIn(Base):
     name: Optional[str] = None
     line_item_id: Optional[str] = None
     input_key: Optional[str] = None
+    quantity_input_key: Optional[str] = None
     approval_note: Optional[str] = None
     bands: Optional[list[BandIn]] = None
 
@@ -170,6 +172,7 @@ class SlabRuleIn(Base):
     name: Optional[str] = None
     line_item_id: Optional[str] = None
     input_key: Optional[str] = None
+    quantity_input_key: Optional[str] = None
     included_floor_types: Optional[str] = None
     floor_adjustment: Num = None
     slabs_per_floor: Num = None

@@ -79,11 +79,28 @@ async def create_estimate(payload: dict = Body(...), ctx: Ctx = Depends(need("es
     pkg = payload.get("package_id") or next((p["id"] for p in snap["packages"] if p.get("is_recommended")), None) or \
         (snap["packages"][0]["id"] if snap["packages"] else None)
     inputs = {i["key"]: i.get("default_value") for i in snap["inputs"]} | (payload.get("inputs") or {})
+    package_ids = {p["id"] for p in snap["packages"]}
+    line_by_id = {line["id"]: line for line in snap["line_items"]}
+    overrides = {}
+    for line_id, raw_override in (payload.get("overrides") or {}).items():
+        line = line_by_id.get(line_id)
+        if not line or not isinstance(raw_override, dict):
+            continue
+        clean_override = {}
+        option_package_id = raw_override.get("option_package_id")
+        if option_package_id in package_ids and line.get("client_can_change_option"):
+            clean_override["option_package_id"] = option_package_id
+        if "selected" in raw_override:
+            clean_override["selected"] = bool(raw_override["selected"])
+        if raw_override.get("quantity") not in (None, "") and line.get("client_can_change_quantity") and line.get("quantity_mode") == "CLIENT_MANUAL":
+            clean_override["quantity"] = str(raw_override["quantity"])
+        if clean_override:
+            overrides[line_id] = clean_override
     eid, rid = new_id(), new_id()
     e = {"id": eid, "organisation_id": ctx.org_id, "number": await _next_number(ctx.org_id),
          "title": payload.get("title") or tpl["name"], "template_id": tid, "client_name": payload.get("client_name") or "",
          "client_email": (payload.get("client_email") or "").lower(), "project_name": payload.get("project_name") or "",
-         "client_user_ids": [], "inputs": inputs, "package_id": pkg, "overrides": {}, "manual_quantities": {},
+         "client_user_ids": [], "inputs": inputs, "package_id": pkg, "overrides": overrides, "manual_quantities": {},
          "status": "DRAFT", "current_revision_id": rid, "revision_number": 1,
          "validity_days": int((org.get("settings") or {}).get("estimate_validity_days") or 30),
          "created_by": ctx.user["id"], "created_at": now(), "updated_at": now()}
@@ -116,11 +133,11 @@ def _pkg_public(p):
     return {k: p.get(k) for k in ("id", "code", "name", "description", "image_url", "is_recommended")}
 
 
-def _options_by_line(snap):
+def _options_by_line(snap, allowed_package_ids=None):
     names = {p["id"]: p["name"] for p in snap["packages"]}
     out = {}
     for o in snap["package_options"]:
-        if o["package_id"] in names:
+        if o["package_id"] in names and (allowed_package_ids is None or o["package_id"] in allowed_package_ids):
             out.setdefault(o["line_item_id"], []).append({"package_id": o["package_id"], "package_name": names[o["package_id"]],
                                                           "label": o.get("specification_label") or "", "details": o.get("specification_details") or ""})
     return out
@@ -223,12 +240,22 @@ async def list_links(est_id: str, ctx: Ctx = Depends(need("estimate.view"))):
 
 @router.post("/estimates/{est_id}/share-links")
 async def create_link(est_id: str, payload: dict = Body({}), ctx: Ctx = Depends(need("estimate.create"))):
-    await _get_est(ctx, est_id)
+    estimate = await _get_est(ctx, est_id)
+    revision = await _current_rev(estimate)
+    snapshot = await version_snapshot(ctx.org_id, revision["template_version_id"])
+    available_package_ids = [package["id"] for package in snapshot["packages"]]
+    requested_package_ids = payload.get("allowed_package_ids", available_package_ids)
+    if not isinstance(requested_package_ids, list):
+        raise HTTPException(400, "allowed_package_ids must be a list")
+    allowed_package_ids = [package_id for package_id in available_package_ids if package_id in requested_package_ids]
+    if not allowed_package_ids:
+        raise HTTPException(400, "Select at least one package for this client link")
     days = max(1, min(int(payload.get("expires_in_days") or 14), 90))
     token = new_share_token()
     link = {"id": new_id(), "organisation_id": ctx.org_id, "estimate_id": est_id, "token_hash": sha256(token), "token_prefix": token[:6],
             "expires_at": (datetime.now(timezone.utc) + timedelta(days=days)).isoformat(), "revoked": False,
-            "can_configure": bool(payload.get("can_configure", True)), "can_download": bool(payload.get("can_download", True)),
+            "can_configure": bool(payload.get("can_configure", False)), "can_download": bool(payload.get("can_download", True)),
+            "allowed_package_ids": allowed_package_ids,
             "use_count": 0, "created_by": ctx.user["id"], "created_at": now()}
     await db.estimate_share_links.insert_one(dict(link))
     await audit(ctx, "create_share_link", "estimates", est_id, meta={"link_id": link["id"], "expires_in_days": days})
@@ -299,7 +326,8 @@ async def _portal(kind, ref, request):
         if not e:
             raise HTTPException(404, "Estimate not found")
         await db.estimate_share_links.update_one({"id": link["id"]}, {"$inc": {"use_count": 1}, "$set": {"last_used_at": now()}})
-        return e, {"can_configure": link["can_configure"], "can_download": link["can_download"]}, f"share-link:{link['token_prefix']}", None
+        return e, {"can_configure": link["can_configure"], "can_download": link["can_download"],
+               "allowed_package_ids": link.get("allowed_package_ids")}, f"share-link:{link['token_prefix']}", None
     if kind == "e":
         user = await current_user(request)
         e = await db.estimate_instances.find_one({"id": ref, "client_user_ids": user["id"]}, NO_ID)
@@ -325,9 +353,11 @@ async def portal_view(kind: str, ref: str, request: Request):
     snap = await version_snapshot(e["organisation_id"], rev["template_version_id"])
     org = await db.organisations.find_one({"id": e["organisation_id"]}, NO_ID)
     editable = perms["can_configure"] and rev["status"] == "DRAFT"
+    allowed_package_ids = perms.get("allowed_package_ids")
+    visible_packages = [p for p in snap["packages"] if allowed_package_ids is None or p["id"] in allowed_package_ids]
     pkg_totals = {}
     if editable:
-        for p in snap["packages"]:
+        for p in visible_packages:
             r = calculate(snap, e.get("inputs") or {}, p["id"], {})
             pkg_totals[p["id"]] = {"grand_total": r["totals"]["grand_total"], "complete": r["is_complete"]}
     st = org.get("settings") or {}
@@ -339,8 +369,8 @@ async def portal_view(kind: str, ref: str, request: Request):
             "template": {k: snap["template"].get(k) for k in ("name", "intro_text", "hero_image_url")},
             "input_defs": [{k: i.get(k) for k in ("key", "label", "input_type", "min_value", "max_value", "help_text", "client_editable", "options")}
                            for i in snap["inputs"] if i.get("client_visible", True)],
-            "packages": [_pkg_public(p) for p in snap["packages"]], "package_totals": pkg_totals,
-            "options_by_line": _options_by_line(snap), "result": client_view(rev["result"]),
+            "packages": [_pkg_public(p) for p in visible_packages], "package_totals": pkg_totals,
+            "options_by_line": _options_by_line(snap, {p["id"] for p in visible_packages}), "result": client_view(rev["result"]),
             "permissions": {**perms, "editable": editable}, "export_formats": st.get("export_formats") or ["pdf", "xlsx", "csv"]}
 
 
@@ -353,7 +383,8 @@ async def portal_config(kind: str, ref: str, request: Request, payload: dict = B
     snap = await version_snapshot(e["organisation_id"], rev["template_version_id"])
     editable_inputs = {i["key"] for i in snap["inputs"] if i.get("client_editable", True) and i.get("client_visible", True)}
     lines = {l["id"]: l for l in snap["line_items"]}
-    pkgs = {p["id"] for p in snap["packages"]}
+    allowed_package_ids = perms.get("allowed_package_ids")
+    pkgs = set(allowed_package_ids) if allowed_package_ids is not None else {p["id"] for p in snap["packages"]}
     upd = {}
     if "inputs" in payload:
         upd["inputs"] = {**(e.get("inputs") or {}), **{k: v for k, v in (payload["inputs"] or {}).items() if k in editable_inputs}}

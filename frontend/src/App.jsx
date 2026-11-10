@@ -1,6 +1,35 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./lib/auth";
+
+const ROUTE_CAPS = {
+  "/admin": "overview.view",
+  "/admin/templates": "templates.view",
+  "/admin/inputs": "catalogue.view",
+  "/admin/sections": "sections.manage",
+  "/admin/line-items": "line_items.manage",
+  "/admin/packages": "packages.manage",
+  "/admin/rules": "rules.publish",
+  "/admin/foundation": "foundation_rules.manage",
+  "/admin/slabs": "slab_rules.manage",
+  "/admin/bathrooms": "bathroom_rules.manage",
+  "/admin/units": "units.manage",
+  "/admin/rate-cards": "rate_cards.manage",
+  "/admin/simulator": "simulator.view",
+  "/admin/gov-estimator": "gov_estimator.view",
+  "/admin/estimates": "estimate.view",
+  "/admin/audit": "audit.view",
+  "/admin/errors": "audit.view",
+  "/admin/settings": "users.manage",
+};
+
+function RequireAccess({ cap, children }) {
+  const { me, loading } = useAuth();
+  if (loading) return null;
+  if (!me) return <Navigate to="/login" replace />;
+  if (me.is_super_admin || me.capabilities?.includes(cap)) return children;
+  return <Navigate to="/admin" replace />;
+}
 import AdminShell from "./layouts/AdminShell";
 import Login from "./pages/Login";
 import ClientEstimate from "./pages/client/ClientEstimate";
@@ -19,6 +48,7 @@ import RateCards from "./pages/admin/RateCards";
 import Estimates from "./pages/admin/Estimates";
 import EstimateDetail from "./pages/admin/EstimateDetail";
 import Simulator from "./pages/admin/Simulator";
+import GovEstimator from "./pages/admin/GovEstimator";
 import AuditPage from "./pages/admin/Audit";
 import ErrorLogs from "./pages/admin/ErrorLogs";
 import Settings from "./pages/admin/Settings";
@@ -42,24 +72,25 @@ export default function App() {
           <Route path="/my" element={<ClientHome />} />
           <Route path="/my/:id" element={<ClientEstimate kind="e" />} />
           <Route path="/admin" element={<AdminShell />}>
-            <Route index element={<Overview />} />
-            <Route path="templates" element={<Templates />} />
-            <Route path="inputs" element={<Inputs />} />
-            <Route path="sections" element={<Sections />} />
-            <Route path="line-items" element={<LineItems />} />
-            <Route path="packages" element={<Packages />} />
-            <Route path="rules" element={<Rules />} />
-            <Route path="foundation" element={<FoundationRules />} />
-            <Route path="slabs" element={<SlabRules />} />
-            <Route path="bathrooms" element={<BathroomRules />} />
-            <Route path="units" element={<Units />} />
-            <Route path="rate-cards" element={<RateCards />} />
-            <Route path="simulator" element={<Simulator />} />
-            <Route path="estimates" element={<Estimates />} />
-            <Route path="estimates/:id" element={<EstimateDetail />} />
-            <Route path="audit" element={<AuditPage />} />
-            <Route path="errors" element={<ErrorLogs />} />
-            <Route path="settings" element={<Settings />} />
+            <Route index element={<RequireAccess cap={ROUTE_CAPS["/admin"]}><Overview /></RequireAccess>} />
+            <Route path="templates" element={<RequireAccess cap={ROUTE_CAPS["/admin/templates"]}><Templates /></RequireAccess>} />
+            <Route path="inputs" element={<RequireAccess cap={ROUTE_CAPS["/admin/inputs"]}><Inputs /></RequireAccess>} />
+            <Route path="sections" element={<RequireAccess cap={ROUTE_CAPS["/admin/sections"]}><Sections /></RequireAccess>} />
+            <Route path="line-items" element={<RequireAccess cap={ROUTE_CAPS["/admin/line-items"]}><LineItems /></RequireAccess>} />
+            <Route path="packages" element={<RequireAccess cap={ROUTE_CAPS["/admin/packages"]}><Packages /></RequireAccess>} />
+            <Route path="rules" element={<RequireAccess cap={ROUTE_CAPS["/admin/rules"]}><Rules /></RequireAccess>} />
+            <Route path="foundation" element={<RequireAccess cap={ROUTE_CAPS["/admin/foundation"]}><FoundationRules /></RequireAccess>} />
+            <Route path="slabs" element={<RequireAccess cap={ROUTE_CAPS["/admin/slabs"]}><SlabRules /></RequireAccess>} />
+            <Route path="bathrooms" element={<RequireAccess cap={ROUTE_CAPS["/admin/bathrooms"]}><BathroomRules /></RequireAccess>} />
+            <Route path="units" element={<RequireAccess cap={ROUTE_CAPS["/admin/units"]}><Units /></RequireAccess>} />
+            <Route path="rate-cards" element={<RequireAccess cap={ROUTE_CAPS["/admin/rate-cards"]}><RateCards /></RequireAccess>} />
+            <Route path="simulator" element={<RequireAccess cap={ROUTE_CAPS["/admin/simulator"]}><Simulator /></RequireAccess>} />
+            <Route path="gov-estimator" element={<RequireAccess cap={ROUTE_CAPS["/admin/gov-estimator"]}><GovEstimator /></RequireAccess>} />
+            <Route path="estimates" element={<RequireAccess cap={ROUTE_CAPS["/admin/estimates"]}><Estimates /></RequireAccess>} />
+            <Route path="estimates/:id" element={<RequireAccess cap={ROUTE_CAPS["/admin/estimates"]}><EstimateDetail /></RequireAccess>} />
+            <Route path="audit" element={<RequireAccess cap={ROUTE_CAPS["/admin/audit"]}><AuditPage /></RequireAccess>} />
+            <Route path="errors" element={<RequireAccess cap={ROUTE_CAPS["/admin/errors"]}><ErrorLogs /></RequireAccess>} />
+            <Route path="settings" element={<RequireAccess cap={ROUTE_CAPS["/admin/settings"]}><Settings /></RequireAccess>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

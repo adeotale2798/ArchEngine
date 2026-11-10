@@ -2,10 +2,22 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Bath, Building, Check, Download, FileSpreadsheet, FileText, Info, Lock, Minus, Plus, RotateCcw, Sheet, Star, TriangleAlert } from "lucide-react";
 import { inr, STATUS } from "@/lib/format";
 import { Badge, Button, Card, Notice, cx } from "./ui";
+import PackageComparison from "@/components/PackageComparison";
 
 const STEPS = [["intro", "Welcome"], ["brief", "Building brief"], ["package", "Package"], ["specs", "Specifications"], ["summary", "Summary & download"]];
 const ICONS = { total_floors: Building, total_bathrooms: Bath };
 const FMT = { pdf: [FileText, "PDF estimate"], xlsx: [FileSpreadsheet, "Excel workbook"], csv: [Sheet, "CSV (line items)"] };
+const TYPE_FINANCIAL_ROWS = [
+  { label: "Plinth Level", description: "Excavation, anti-termite, backfilling, RCC foundation and plinth work.", values: { TYPE_A: 750, TYPE_B: 800, TYPE_C: 850 } },
+  { label: "Ground Floor Roof", description: "RCC roof slab, masonry, plaster, columns, lintels and finishing items above plinth level.", values: { TYPE_A: 1900, TYPE_B: 2100, TYPE_C: 2300 } },
+  { label: "Upper Floor Roofs (per floor)", description: "RCC roof slab, beams, masonry, plaster and typical upper-floor finish items for each floor.", values: { TYPE_A: 1900, TYPE_B: 2100, TYPE_C: 2300 } },
+  { label: "Terrace Level Slab", description: "Terrace slab, waterproofing preparation and related terrace structure items.", values: { TYPE_A: 1900, TYPE_B: 2100, TYPE_C: 2300 } },
+  { label: "Site development", description: "Filling, anti-termite treatment, landscape, parking and marginal space work.", values: { TYPE_A: 475, TYPE_B: 500, TYPE_C: 550 } },
+  { label: "Water tank (UG + OHT)", description: "Underground and overhead water tank RCC and waterproofing work.", values: { TYPE_A: 21, TYPE_B: 23, TYPE_C: 25 } },
+  { label: "Compound wall", description: "Boundary wall and elevation treatment as specified.", values: { TYPE_A: 350, TYPE_B: 350, TYPE_C: 350 } },
+  { label: "Parapet Wall", description: "Parapet wall and MS pipe work as per design.", values: { TYPE_A: 250, TYPE_B: 250, TYPE_C: 250 } },
+  { label: "Terrace Waterproofing", description: "Brickbat coba and waterproofing layer on the terrace.", values: { TYPE_A: 120, TYPE_B: 120, TYPE_C: 120 } },
+];
 
 function Stepper({ step, setStep }) {
   return (
@@ -24,7 +36,7 @@ function Counter({ def, value, onChange, disabled }) {
   const lo = def.min_value != null ? Number(def.min_value) : 0;
   const hi = def.max_value != null ? Number(def.max_value) : 999;
   return (
-    <Card className="p-8 shadow-[0_10px_30px_-15px_rgba(60,40,20,.25)]" data-testid={`brief-${def.key}`}>
+    <Card className="animate-card-rise p-8 shadow-[0_18px_40px_-24px_rgba(60,40,20,.25)]" data-testid={`brief-${def.key}`}>
       <div className="flex items-start gap-4"><div className="rounded-lg bg-primary/10 p-3 text-primary"><Icon size={26} /></div>
         <div className="flex-1"><div className="font-display text-xl font-semibold">{def.label}</div><p className="mt-1 text-sm text-muted-foreground">{def.help_text}</p></div></div>
       <div className="mt-6 flex items-center gap-5">
@@ -41,7 +53,7 @@ function CostDock({ result, prevTotal, busy }) {
   const t = result?.totals;
   const delta = prevTotal != null && t ? Number(t.grand_total) - Number(prevTotal) : 0;
   return (
-    <Card className="sticky top-6 space-y-3 bg-card/95 p-6 backdrop-blur-xl" data-testid="cost-dock">
+    <Card className="sticky top-6 animate-card-rise space-y-3 bg-card/95 p-6 shadow-[0_18px_40px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl" data-testid="cost-dock">
       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Indicative budget · {result?.package?.name}</div>
       <div className={cx("num text-4xl font-semibold transition-opacity", busy && "opacity-50")} data-testid="grand-total">{inr(t?.grand_total)}</div>
       {delta !== 0 && <div className={cx("num text-sm font-semibold", delta > 0 ? "text-danger" : "text-success")} data-testid="total-delta">{delta > 0 ? "+" : "−"}{inr(Math.abs(delta))} from your last change</div>}
@@ -55,18 +67,74 @@ function CostDock({ result, prevTotal, busy }) {
   );
 }
 
+function getPackageSortKey(pkg) {
+  const raw = `${pkg?.code || ""} ${pkg?.name || ""}`.toUpperCase();
+  if (/TYPE[_\s-]*A/.test(raw)) return "A";
+  if (/TYPE[_\s-]*B/.test(raw)) return "B";
+  if (/TYPE[_\s-]*C/.test(raw)) return "C";
+  if (raw.includes("ONLY_CIVIL") || /civil/i.test(pkg?.name || "")) return "ZZZ_CIVIL";
+  return `ZZZ_${raw || pkg?.id || "UNKNOWN"}`;
+}
+
 export default function EstimateWizard({ meta, inputDefs, packages, packageTotals = {}, optionsByLine = {}, state, result, editable, busy, onUpdate, exportFormats = [], onDownload, prevTotal }) {
   const [step, setStep] = useState("intro");
+  const [packageOverrides, setPackageOverrides] = useState(() => state.package_id ? { [state.package_id]: state.overrides || {} } : {});
   const lines = result?.lines || [];
+  const comparisonOptions = useMemo(() => Object.values(optionsByLine).flat(), [optionsByLine]);
+  const orderedPackages = useMemo(() => [...packages].sort((a, b) => {
+    const keyA = getPackageSortKey(a);
+    const keyB = getPackageSortKey(b);
+    const order = { A: 0, B: 1, C: 2 };
+    if (keyA in order && keyB in order) return order[keyA] - order[keyB];
+    if (keyA in order) return -1;
+    if (keyB in order) return 1;
+    if (keyA === "ZZZ_CIVIL" && keyB !== "ZZZ_CIVIL") return 1;
+    if (keyA !== "ZZZ_CIVIL" && keyB === "ZZZ_CIVIL") return -1;
+    return String(a?.name || a?.code || a?.id).localeCompare(String(b?.name || b?.code || b?.id));
+  }), [packages]);
+  const typePackages = useMemo(() => orderedPackages.filter((pkg) => pkg.code !== "ONLY_CIVIL" && !/civil/i.test(pkg.name || "")), [orderedPackages]);
+  const civilPackages = useMemo(() => orderedPackages.filter((pkg) => pkg.code === "ONLY_CIVIL" || /civil/i.test(pkg.name || "")), [orderedPackages]);
+  const typeLineIds = useMemo(() => new Set(comparisonOptions.filter((option) => typePackages.some((pkg) => pkg.id === option.package_id))
+    .map((option) => option.line_item_id)), [comparisonOptions, typePackages]);
+  const civilLineIds = useMemo(() => new Set(comparisonOptions.filter((option) => civilPackages.some((pkg) => pkg.id === option.package_id))
+    .map((option) => option.line_item_id)), [comparisonOptions, civilPackages]);
+  const typeLines = useMemo(() => lines.filter((line) => typeLineIds.has(line.line_item_id)), [lines, typeLineIds]);
+  const civilLines = useMemo(() => lines.filter((line) => civilLineIds.has(line.line_item_id)), [lines, civilLineIds]);
   const linesBySection = useMemo(() => (result?.sections || []).map((s) => ({ ...s, lines: lines.filter((l) => l.section_id === s.id) })), [result, lines]);
   const next = () => setStep(STEPS[Math.min(STEPS.findIndex((s) => s[0] === step) + 1, STEPS.length - 1)][0]);
   const prev = () => setStep(STEPS[Math.max(STEPS.findIndex((s) => s[0] === step) - 1, 0)][0]);
-  const setOverride = (lid, patch) => onUpdate({ overrides: { ...state.overrides, [lid]: { ...(state.overrides?.[lid] || {}), ...patch } } });
-  const resetOne = (lid) => { const o = { ...state.overrides }; delete o[lid]; onUpdate({ overrides: o }); };
+  const setOverride = (lid, patch) => {
+    const overrides = { ...state.overrides, [lid]: { ...(state.overrides?.[lid] || {}), ...patch } };
+    setPackageOverrides((current) => ({ ...current, [state.package_id]: overrides }));
+    onUpdate({ overrides });
+  };
+  const resetOne = (lid) => {
+    const overrides = { ...state.overrides };
+    delete overrides[lid];
+    setPackageOverrides((current) => ({ ...current, [state.package_id]: overrides }));
+    onUpdate({ overrides });
+  };
+  const selectPackage = (packageId) => {
+    const overrides = packageOverrides[packageId] || {};
+    setPackageOverrides((current) => ({ ...current, [packageId]: overrides }));
+    onUpdate({ package_id: packageId, overrides });
+  };
+  const setComparisonOption = (targetPackageId, lineId, sourcePackageId) => {
+    const nextForTarget = { ...(packageOverrides[targetPackageId] || (targetPackageId === state.package_id ? state.overrides : {})) };
+    if (sourcePackageId) nextForTarget[lineId] = { ...(nextForTarget[lineId] || {}), option_package_id: sourcePackageId };
+    else {
+      const current = { ...(nextForTarget[lineId] || {}) };
+      delete current.option_package_id;
+      if (Object.keys(current).length) nextForTarget[lineId] = current;
+      else delete nextForTarget[lineId];
+    }
+    setPackageOverrides((current) => ({ ...current, [targetPackageId]: nextForTarget }));
+    if (targetPackageId === state.package_id) onUpdate({ overrides: nextForTarget });
+  };
   const nOverrides = Object.keys(state.overrides || {}).length;
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div className="mx-auto max-w-6xl px-3 py-5 sm:px-4 md:px-8 md:py-10">
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card/80 p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.32)] backdrop-blur-sm">
         <div><div className="font-display text-2xl font-extrabold" data-testid="org-brand" style={{ color: meta.org?.branding?.primary_color }}>{meta.org?.name}</div>
           <div className="text-xs text-muted-foreground">{meta.org?.branding?.tagline}</div></div>
         <div className="text-right text-xs text-muted-foreground"><div className="num font-semibold text-foreground" data-testid="estimate-number">{meta.number}{meta.revision ? ` · rev ${meta.revision.revision_number}` : ""}</div>
@@ -74,7 +142,7 @@ export default function EstimateWizard({ meta, inputDefs, packages, packageTotal
       </header>
       <Stepper step={step} setStep={setStep} />
       {!editable && <Notice tone="info" icon={Lock} className="mb-6">This estimate is locked for review or has been issued. You can view and download it; ask your architect for a revision to make changes.</Notice>}
-      <div className="grid gap-10 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px] lg:gap-10">
         <div className="min-w-0 animate-rise" key={step}>
           {step === "intro" && (
             <div className="grid items-center gap-10 md:grid-cols-[1.1fr_1fr]" data-testid="step-intro-panel">
@@ -96,17 +164,107 @@ export default function EstimateWizard({ meta, inputDefs, packages, packageTotal
             </div>)}
           {step === "package" && (
             <div data-testid="step-package-panel"><h2 className="mb-6 text-3xl font-bold">Choose a package</h2>
-              <div className="grid gap-6 sm:grid-cols-2">
-                {packages.map((p) => { const active = state.package_id === p.id; return (
-                  <button key={p.id} disabled={!editable} data-testid={`package-option-${p.code}`} onClick={() => onUpdate({ package_id: p.id })}
-                    className={cx("group relative overflow-hidden rounded-lg border-2 bg-card text-left transition-transform hover:-translate-y-1", active ? "border-primary shadow-xl" : "border-border")}>
-                    <div className="h-44 overflow-hidden bg-muted">{p.image_url && <img src={p.image_url} alt={p.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />}</div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="client-package-options">
+                {orderedPackages.map((p) => { const active = state.package_id === p.id; return (
+                  <button key={p.id} disabled={!editable} data-testid={`package-option-${p.code}`} onClick={() => selectPackage(p.id)}
+                    className={cx("group relative overflow-hidden rounded-2xl border-2 bg-card text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_-24px_rgba(15,23,42,0.35)]", active ? "border-primary shadow-xl shadow-primary/10" : "border-border")}> 
+                    <div className="h-44 overflow-hidden bg-muted">{p.image_url && <img src={p.image_url} alt={p.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 animate-glow" />}</div>
                     {p.is_recommended && <Badge tone="primary" className="absolute right-3 top-3 bg-white"><Star size={11} /> Recommended</Badge>}
                     <div className="p-6"><div className="flex items-center justify-between"><span className="font-display text-2xl font-semibold">{p.name}</span>{active && <Check className="text-primary" />}</div>
                       <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
                       {packageTotals[p.id] && <div className="num mt-4 text-lg font-semibold" data-testid={`package-total-${p.code}`}>{inr(packageTotals[p.id].grand_total)}{!packageTotals[p.id].complete && <span className="ml-2 text-xs text-warning">needs review</span>}</div>}</div>
                   </button>); })}
-              </div></div>)}
+              </div>
+              <div className="mt-8 space-y-5" data-testid="client-package-comparison">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">Compare packages</div>
+                    <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Compare specifications</h3>
+                  </div>
+                  <p className="max-w-xl text-sm text-muted-foreground">Drag an item between the packages in your link. Civil Work stays separate from the package specifications.</p>
+                </div>
+
+                <div className={cx("grid items-start gap-5", civilPackages.length && "xl:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]")}>
+                  {typePackages.length > 0 && (
+                    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-slate-50 px-4 py-3">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Main package comparison</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {typePackages.map((pkg) => (
+                            <div key={pkg.id} className={cx("rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]", state.package_id === pkg.id ? "border-primary/60 bg-primary/10 text-primary" : "border-border bg-white text-slate-500")}>
+                              {pkg.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <PackageComparison packages={typePackages} allPackages={packages}
+                        lines={typeLines} options={comparisonOptions} overrides={Object.fromEntries(
+                          Object.entries(packageOverrides).map(([packageId, packageLines]) => [packageId,
+                            Object.fromEntries(Object.entries(packageLines || {}).map(([lineId, override]) => [lineId, override.option_package_id]).filter(([, sourceId]) => !!sourceId))]),
+                        )} results={result && state.package_id ? { [state.package_id]: { lines } } : {}}
+                        editable={editable} showRates={false} selectedPackageId={state.package_id}
+                        lockedPackageIds={packages.filter((pkg) => pkg.code === "ONLY_CIVIL" || /civil/i.test(pkg.name || "")).map((pkg) => pkg.id)}
+                        onOverrideChange={setComparisonOption} />
+                    </div>
+                  )}
+
+                  {civilPackages.length > 0 && (
+                    <div className="space-y-3 rounded-2xl border border-border bg-slate-50 p-3 shadow-[0_18px_30px_-30px_rgba(15,23,42,0.5)]">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Civil work</div>
+                        <Badge tone="secondary">Separate</Badge>
+                      </div>
+                      {civilPackages.map((pkg) => (
+                        <section key={pkg.id} className="min-w-0 overflow-hidden rounded-xl border border-border bg-white" data-testid="client-civil-comparison">
+                          {civilLines.length > 0 ? <PackageComparison packages={[pkg]} allPackages={packages}
+                            lines={civilLines} options={comparisonOptions} overrides={Object.fromEntries(
+                              Object.entries(packageOverrides).map(([packageId, packageLines]) => [packageId,
+                                Object.fromEntries(Object.entries(packageLines || {}).map(([lineId, override]) => [lineId, override.option_package_id]).filter(([, sourceId]) => !!sourceId))]),
+                            )} results={result && state.package_id ? { [state.package_id]: { lines } } : {}}
+                            editable={editable} showRates={false} selectedPackageId={state.package_id}
+                            lockedPackageIds={[pkg.id]} onOverrideChange={setComparisonOption} />
+                            : <div className="rounded-lg border border-border p-4 text-xs text-muted-foreground">No Civil Work items are configured for this estimate.</div>}
+                        </section>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-[0_18px_35px_-32px_rgba(15,23,42,0.38)]">
+                  <div className="flex items-center justify-between gap-3 border-b border-border bg-slate-50 px-4 py-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Financials</div>
+                    <Badge tone="info">Type A · B · C</Badge>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+                      <thead className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+                        <tr>
+                          <th className="border-b border-r border-border px-3 py-3">Sr. No</th>
+                          <th className="border-b border-r border-border px-3 py-3">Floor level</th>
+                          <th className="border-b border-r border-border px-3 py-3">Description</th>
+                          <th className="border-b border-r border-border px-3 py-3 text-right">Type A</th>
+                          <th className="border-b border-r border-border px-3 py-3 text-right">Type B</th>
+                          <th className="border-b border-border px-3 py-3 text-right">Type C</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TYPE_FINANCIAL_ROWS.map((row, index) => (
+                          <tr key={row.label} className="align-top text-[13px]">
+                            <td className="border-b border-r border-border px-3 py-3 font-semibold text-muted-foreground">{index + 1}</td>
+                            <td className="border-b border-r border-border px-3 py-3 font-medium">{row.label}</td>
+                            <td className="border-b border-r border-border px-3 py-3 text-muted-foreground">{row.description}</td>
+                            <td className="border-b border-r border-border px-3 py-3 text-right font-semibold num">{row.values.TYPE_A}</td>
+                            <td className="border-b border-r border-border px-3 py-3 text-right font-semibold num">{row.values.TYPE_B}</td>
+                            <td className="border-b border-border px-3 py-3 text-right font-semibold num">{row.values.TYPE_C}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div></div>) }
           {step === "specs" && (
             <div className="space-y-8" data-testid="step-specs-panel">
               <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-bold">Specifications</h2>
@@ -142,7 +300,7 @@ export default function EstimateWizard({ meta, inputDefs, packages, packageTotal
         </div>
         <div className="hidden lg:block"><CostDock result={result} prevTotal={prevTotal} busy={busy} /></div>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-5 py-3 backdrop-blur-xl lg:hidden"><div className="flex justify-between text-sm"><span>Indicative total</span><span className="num font-semibold" data-testid="mobile-grand-total">{inr(result?.totals?.grand_total)}</span></div></div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.5)] backdrop-blur-xl lg:hidden"><div className="mx-auto flex max-w-md items-center justify-between rounded-2xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm"><span className="font-medium">Indicative total</span><span className="num font-semibold text-primary" data-testid="mobile-grand-total">{inr(result?.totals?.grand_total)}</span></div></div>
     </div>
   );
 }

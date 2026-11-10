@@ -18,6 +18,7 @@ function SetEditor({ rs, lines, units, pkgs, templateId, onSaved }) {
       await save("foundation_rules", d.id ? body : { ...body, template_id: templateId }, d.id); toast.success("Foundation rule saved"); onSaved();
     } catch (e) { notifyError(e); }
   };
+
   return (
     <Card className="space-y-5 p-6" data-testid={`foundation-set-${d.id || "new"}`}>
       <div className="grid gap-4 md:grid-cols-3">
@@ -26,7 +27,7 @@ function SetEditor({ rs, lines, units, pkgs, templateId, onSaved }) {
           options={lines.filter((l) => l.quantity_mode === "FLOOR_BAND_LOOKUP").map((l) => [l.id, `${l.code} · ${l.name}`])} /></Field>
         <Field label="Driven by input key"><Input data-testid="fr-input" value={d.input_key || "total_floors"} onChange={(e) => setD({ ...d, input_key: e.target.value })} /></Field>
       </div>
-      <p className="text-xs text-muted-foreground">Bands are inclusive on both ends (min ≤ floors ≤ max). Leave max empty for “and above”. Rate per package overrides the line item's package rate; leave blank to use it.</p>
+      <p className="text-sm text-muted-foreground">Bands are inclusive on both ends (min ≤ floors ≤ max). Leave max empty for “and above”. Rate per package overrides the line item's package rate; leave blank to use it.</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] text-sm">
           <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -71,7 +72,7 @@ export default function FoundationRules() {
       {draft && <SetEditor rs={draft} lines={lines.rows} units={units.rows} pkgs={pkgs.rows} templateId={templateId} onSaved={() => { setDraft(null); sets.reload(); }} />}
       {sets.rows.length === 0 && !draft ? <Empty title="No foundation rules yet">Set a line item's quantity mode to “Floor-band lookup”, then create a rule set here.</Empty> :
         sets.rows.map((rs) => <SetEditor key={rs.id} rs={rs} lines={lines.rows} units={units.rows} pkgs={pkgs.rows} templateId={templateId} onSaved={sets.reload} />)}
-      <RulePreview inputKey="total_floors" lineIds={sets.rows.map((s) => s.line_item_id)} title="Floor change simulator — foundation" />
+      <RulePreview inputKey="total_floors" lineIds={sets.rows.map((s) => s.line_item_id)} title="Floor change simulator — Foundation" />
     </div>
   );
 }
