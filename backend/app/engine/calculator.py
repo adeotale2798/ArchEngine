@@ -65,13 +65,14 @@ def validate_inputs(snap, raw: dict, issues: Issues) -> tuple[dict, list]:
 
 def resolve_option(snap, line_id, package_id):
     seen = set()
+    selected_package_id = package_id
     while package_id and package_id not in seen:
         seen.add(package_id)
         opt = snap["_options"].get((package_id, line_id))
         if opt:
             return opt, package_id
         package_id = (snap["_packages"].get(package_id) or {}).get("inherits_from")
-    return None, None
+    return None, selected_package_id
 
 
 def _topo(lines, rules, issues: Issues):
@@ -110,11 +111,14 @@ def _quantity(line, snap, env, sel, issues: Issues):
     unit_id, extra = line.get("unit_id"), {}
     label = lambda k: next((i["label"] for i in snap["inputs"] if i["key"] == k), k)
     if mode == "FIXED_QUANTITY":
-        qv = D(line.get("fixed_quantity"))
+        quantity_input_key = line.get("quantity_input_key")
+        input_quantity = D(env.get(f"input.{quantity_input_key}")) if quantity_input_key else None
+        qv = input_quantity if input_quantity is not None else D(line.get("fixed_quantity"))
         if qv is None:
             issues.add("critical", "QTY_MISSING", f"{line['code']}: fixed quantity not configured", line)
             return None, unit_id, "Quantity not configured", "", extra
-        t = f"Configured quantity {s(qv)}" + (" (template assumption)" if line.get("is_assumption") else "")
+        t = f"{label(quantity_input_key)}: {s(qv)}" if input_quantity is not None else f"Configured quantity {s(qv)}"
+        t += " (template assumption)" if line.get("is_assumption") else ""
         return qv, unit_id, t, t, extra
     if mode == "LUMP_SUM":
         return Decimal(1), unit_id, "Lump sum", "Lump sum", extra
@@ -138,13 +142,17 @@ def _quantity(line, snap, env, sel, issues: Issues):
         count = max(floors + adj, ZERO)
         spf = D(rule.get("slabs_per_floor")) or Decimal(1)
         basis = rule.get("quantity_basis") or "COUNT"
-        qpf = D(rule.get("quantity_per_floor"))
+        quantity_input_key = rule.get("quantity_input_key")
+        input_qpf = D(env.get(f"input.{quantity_input_key}")) if quantity_input_key else None
+        qpf = input_qpf if input_qpf is not None else D(rule.get("quantity_per_floor"))
         if basis in ("AREA", "VOLUME") and qpf is None:
             issues.add("critical", "SLAB_BASIS_MISSING", f"{line['code']}: quantity per floor not configured", line)
             return None, unit_id, "Quantity per floor missing", "", extra
         qv = count * spf * (qpf if basis in ("AREA", "VOLUME") else Decimal(1))
         adj_txt = f" {'+' if adj >= 0 else '−'} {s(abs(adj))} adjustment" if adj else ""
         per = f" × {s(qpf)} per slab" if basis in ("AREA", "VOLUME") else ""
+        if input_qpf is not None:
+            per += f" ({label(quantity_input_key)})"
         t = f"Floors: {s(floors)}{adj_txt} = {s(count)} × {s(spf)} slab/floor{per} = {s(qv)} [{rule.get('name')}]"
         if rule.get("is_assumption"):
             t += " — indicative template quantity, not measured"
@@ -178,10 +186,14 @@ def _quantity(line, snap, env, sel, issues: Issues):
                        line, client_message="This floor count needs architect review before the foundation can be priced.")
             extra["requires_review"] = True
             return None, unit_id, f"Total floors: {s(floors)} → no configured band", "", extra
-        qv = D(band.get("quantity"))
+        quantity_input_key = rs.get("quantity_input_key")
+        input_quantity = D(env.get(f"input.{quantity_input_key}")) if quantity_input_key else None
+        qv = input_quantity if input_quantity is not None else D(band.get("quantity"))
         extra.update(band=band, requires_review=bool(band.get("requires_review")))
         t = (f"Total floors: {s(floors)} → matched architect-configured band '{band.get('label')}' "
              f"[{band.get('min_floors')}–{band.get('max_floors') or '∞'}] → {band.get('specification') or 'package specification'}")
+        if input_quantity is not None:
+            t += f" → {label(quantity_input_key)}: {s(input_quantity)}"
         if qv is None:
             issues.add("critical", "QTY_MISSING", f"{line['code']}: band '{band.get('label')}' has no quantity", line)
             return None, unit_id, t, "", extra

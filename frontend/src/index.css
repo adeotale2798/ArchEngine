@@ -16,12 +16,48 @@
   --success: 150 45% 34%;
   --warning: 38 90% 42%;
   --danger: 0 65% 46%;
+  font-size: 16px;
 }
 
-body { @apply bg-background text-foreground font-sans antialiased; }
+html { font-size: 16px; }
+body {
+  @apply bg-background text-foreground font-sans antialiased;
+  background:
+    radial-gradient(circle at top left, hsl(var(--primary) / 0.08), transparent 28%),
+    radial-gradient(circle at bottom right, hsl(36 90% 56% / 0.08), transparent 24%),
+    hsl(var(--background));
+  font-size: 15px;
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+#root { min-height: 100vh; }
 h1, h2, h3, h4 { @apply font-display tracking-tight; }
 ::selection { background: hsl(var(--primary) / .25); }
 .num { @apply font-mono tabular-nums; }
 .grain { background-image: radial-gradient(hsl(var(--foreground) / .05) 1px, transparent 1px); background-size: 14px 14px; }
-.blueprint { background-color: hsl(var(--secondary)); background-image: linear-gradient(hsl(0 0% 100% / .06) 1px, transparent 1px), linear-gradient(90deg, hsl(0 0% 100% / .06) 1px, transparent 1px); background-size: 28px 28px; }
+.blueprint { background: linear-gradient(180deg, hsl(215 25% 24%) 0%, hsl(215 22% 19%) 100%); background-image: linear-gradient(hsl(0 0% 100% / .06) 1px, transparent 1px), linear-gradient(90deg, hsl(0 0% 100% / .06) 1px, transparent 1px), linear-gradient(180deg, hsl(215 25% 24%) 0%, hsl(215 22% 19%) 100%); background-size: 28px 28px, 28px 28px, auto; }
 :focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+input, textarea, select, button { font: inherit; }
+
+@keyframes floatCard {
+  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes softGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.08); }
+}
+
+.animate-card-rise { animation: floatCard .35s ease-out both; }
+.animate-glow { animation: softGlow 2.8s ease-in-out infinite; }
+
+@media (max-width: 767px) {
+  html { font-size: 14px; }
+  body { -webkit-tap-highlight-color: transparent; }
+  .grain { background-size: 12px 12px; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; border: 2px solid hsl(var(--muted)); }

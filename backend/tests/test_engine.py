@@ -68,6 +68,31 @@ def test_slab_per_floor_and_assumption_label():
     assert "not measured" in sl["trace"]
 
 
+def test_area_inputs_drive_plinth_ground_and_per_slab_quantities():
+    s = snap()
+    s["inputs"].extend([
+        {"id": "i3", "key": "plinth_area_sqft", "label": "Plinth area", "input_type": "decimal", "required": False},
+        {"id": "i4", "key": "ground_floor_area_sqft", "label": "Ground floor slab area", "input_type": "decimal", "required": False},
+        {"id": "i5", "key": "typical_floor_area_sqft", "label": "Area per slab", "input_type": "decimal", "required": False},
+    ])
+    s["foundation_rule_sets"][0]["quantity_input_key"] = "plinth_area_sqft"
+    s["slab_rules"][0]["quantity_input_key"] = "typical_floor_area_sqft"
+    s["slab_rules"][0]["floor_adjustment"] = "-1"
+    s["line_items"].append({"id": "ground", "code": "GROUND", "name": "Ground Floor Roof", "section_id": "s1",
+                            "quantity_mode": "FIXED_QUANTITY", "fixed_quantity": "1290", "quantity_input_key": "ground_floor_area_sqft",
+                            "unit_id": "sft", "sort_order": 5})
+    s["package_options"].append({"id": "ground-option", "package_id": "pa", "line_item_id": "ground", "rate": "20"})
+    result = calculate(s, {"total_floors": 3, "total_bathrooms": 2, "plinth_area_sqft": "75",
+                           "ground_floor_area_sqft": "110", "typical_floor_area_sqft": "80"}, "pa")
+    assert line(result, "FOUND")["quantity"] == "75" and line(result, "FOUND")["amount"] == "7500.00"
+    assert line(result, "GROUND")["quantity"] == "110" and line(result, "GROUND")["amount"] == "2200.00"
+    assert line(result, "SLAB")["quantity"] == "160" and line(result, "SLAB")["amount"] == "1600.00"
+    template_areas = calculate(s, {"total_floors": 3, "total_bathrooms": 2}, "pa")
+    assert line(template_areas, "FOUND")["quantity"] == "10"
+    assert line(template_areas, "GROUND")["quantity"] == "1290"
+    assert line(template_areas, "SLAB")["quantity"] == "2000"
+
+
 def test_bathroom_count_drives_quantity():
     r2 = calculate(snap(), {"total_floors": 2, "total_bathrooms": 2}, "pa")
     r4 = calculate(snap(), {"total_floors": 2, "total_bathrooms": 4}, "pa")

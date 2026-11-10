@@ -1,4 +1,6 @@
 node_modules/
+.venv/
+.local/
 frontend/dist/
 __pycache__/
 *.pyc
@@ -8,6 +10,9 @@ backups/
 .env
 .env.*
 *.env
+!.env.example
+!**/.env.example
+!**/.env.*.example
 credentials.json
 *.pem
 *.key

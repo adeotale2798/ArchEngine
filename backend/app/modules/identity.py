@@ -6,7 +6,7 @@ from app.core.audit import audit
 from app.core.db import NO_ID, clean, db, new_id, now
 from app.core.deps import Ctx, current_user, get_ctx, need, tenant
 from app.core.errors import record_error
-from app.core.permissions import ROLES
+from app.core.permissions import CAPABILITY_GROUPS, ROLES, custom_role_caps
 from app.core.ratelimit import client_ip, limit
 from app.core.security import create_token, hash_password, verify_password
 
@@ -63,12 +63,18 @@ async def change_password(current: str = Body(..., embed=True), new: str = Body(
 
 
 @router.get("/org")
-async def get_org(ctx: Ctx = Depends(need("catalogue.view"))):
+async def get_org(ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
     return clean(await db.organisations.find_one({"id": ctx.org_id}, NO_ID))
 
 
 @router.patch("/org")
-async def update_org(payload: dict = Body(...), ctx: Ctx = Depends(need("org.manage"))):
+async def update_org(payload: dict = Body(...), ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
+    if isinstance(payload.get("settings"), dict) and "custom_roles" in payload["settings"] and not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
     before = await db.organisations.find_one({"id": ctx.org_id}, NO_ID)
     upd = {}
     if "name" in payload:
@@ -90,15 +96,28 @@ async def update_org(payload: dict = Body(...), ctx: Ctx = Depends(need("org.man
 
 
 @router.get("/org/roles")
-async def roles(ctx: Ctx = Depends(need("catalogue.view"))):
-    return [{"key": k, "label": v["label"], "capabilities": sorted(v["caps"])} for k, v in ROLES.items()]
+async def roles(ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
+    org = await db.organisations.find_one({"id": ctx.org_id}, {"settings": 1, "_id": 0}) if ctx.org_id else {}
+    custom = custom_role_caps((org or {}).get("settings") or {})
+    merged = {k: {"label": v["label"], "capabilities": sorted(v["caps"])} for k, v in ROLES.items()}
+    for key, caps in custom.items():
+        merged[key] = {"label": key.replace("_", " ").title(), "capabilities": sorted(caps)}
+    return [{"key": k, "label": v["label"], "capabilities": v["capabilities"]} for k, v in merged.items()]
 
 
 @router.get("/org/users")
-async def list_users(ctx: Ctx = Depends(need("users.manage"))):
+async def list_users(ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
     mems = await db.memberships.find(tenant(ctx), NO_ID).to_list(1000)
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": [m["user_id"] for m in mems]}}, {"_id": 0, "password_hash": 0}).to_list(1000)}
-    return [{**users.get(m["user_id"], {}), "membership_id": m["id"], "role": m["role"], "membership_active": m["active"]} for m in mems]
+    out = []
+    for m in mems:
+        caps = m.get("capabilities") or list(ROLES.get(m.get("role"), {}).get("caps", set()))
+        out.append({**users.get(m["user_id"], {}), "membership_id": m["id"], "role": m["role"], "membership_active": m["active"], "capabilities": [str(cap) for cap in dict.fromkeys(caps) if str(cap).strip()]})
+    return out
 
 
 class NewUser(BaseModel):
@@ -106,11 +125,17 @@ class NewUser(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     role: str
     password: str = Field(min_length=10, max_length=200)
+    capabilities: list[str] | None = None
 
 
 @router.post("/org/users")
-async def create_user(body: NewUser, ctx: Ctx = Depends(need("users.manage"))):
-    if body.role not in ROLES:
+async def create_user(body: NewUser, ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
+    org = await db.organisations.find_one({"id": ctx.org_id}, {"settings": 1, "_id": 0}) if ctx.org_id else {}
+    custom = custom_role_caps((org or {}).get("settings") or {})
+    allowed_roles = set(ROLES) | set(custom)
+    if body.role not in allowed_roles:
         raise HTTPException(400, "Unknown role")
     email = body.email.lower()
     user = await db.users.find_one({"email": email}, NO_ID)
@@ -120,23 +145,34 @@ async def create_user(body: NewUser, ctx: Ctx = Depends(need("users.manage"))):
         await db.users.insert_one(dict(user))
     if await db.memberships.find_one(tenant(ctx, user_id=user["id"])):
         raise HTTPException(409, "User is already a member of this organisation")
-    await db.memberships.insert_one({"id": new_id(), "organisation_id": ctx.org_id, "user_id": user["id"], "role": body.role, "active": True, "created_at": now()})
-    await audit(ctx, "add_member", "users", user["id"], meta={"email": email, "role": body.role})
-    return {"id": user["id"], "email": email, "role": body.role}
+    capabilities = list(dict.fromkeys((body.capabilities or []) if body.capabilities else list(ROLES[body.role]["caps"])))
+    await db.memberships.insert_one({"id": new_id(), "organisation_id": ctx.org_id, "user_id": user["id"], "role": body.role,
+                                    "capabilities": capabilities, "active": True, "created_at": now()})
+    await audit(ctx, "add_member", "users", user["id"], meta={"email": email, "role": body.role, "capabilities": capabilities})
+    return {"id": user["id"], "email": email, "role": body.role, "capabilities": capabilities}
 
 
 @router.patch("/org/users/{user_id}")
-async def update_member(user_id: str, payload: dict = Body(...), ctx: Ctx = Depends(need("users.manage"))):
+async def update_member(user_id: str, payload: dict = Body(...), ctx: Ctx = Depends(get_ctx)):
+    if not ctx.is_super:
+        raise HTTPException(403, "Platform super admin only")
     m = await db.memberships.find_one(tenant(ctx, user_id=user_id), NO_ID)
     if not m:
         raise HTTPException(404, "Member not found")
     upd = {}
-    if payload.get("role") in ROLES:
+    org = await db.organisations.find_one({"id": ctx.org_id}, {"settings": 1, "_id": 0}) if ctx.org_id else {}
+    custom = custom_role_caps((org or {}).get("settings") or {})
+    allowed_roles = set(ROLES) | set(custom)
+    if payload.get("role") in allowed_roles:
         upd["role"] = payload["role"]
+    if "capabilities" in payload:
+        upd["capabilities"] = [str(cap) for cap in dict.fromkeys(payload["capabilities"] or []) if str(cap).strip()]
     if "active" in payload:
         upd["active"] = bool(payload["active"])
     if user_id == ctx.user["id"] and (upd.get("role", "org_admin") != "org_admin" or upd.get("active") is False):
         raise HTTPException(409, "You cannot demote or disable yourself")
+    if "role" in upd and "capabilities" not in upd:
+        upd["capabilities"] = list(ROLES.get(upd["role"], {}).get("caps", set()))
     await db.memberships.update_one({"id": m["id"]}, {"$set": upd})
     await audit(ctx, "update_member", "users", user_id, {k: m.get(k) for k in upd}, upd)
     return {"ok": True}

@@ -6,28 +6,28 @@ export { cx };
 
 export function Button({ variant = "primary", size = "md", className, children, ...p }) {
   const v = {
-    primary: "bg-primary text-primary-foreground hover:brightness-110 shadow-sm",
-    secondary: "bg-secondary text-secondary-foreground hover:brightness-125",
-    outline: "border border-border bg-card hover:bg-muted",
+    primary: "bg-primary text-primary-foreground hover:brightness-110 shadow-md shadow-primary/20",
+    secondary: "bg-secondary text-secondary-foreground hover:brightness-125 shadow-sm",
+    outline: "border border-border bg-card hover:bg-muted active:bg-muted/80",
     ghost: "hover:bg-muted",
-    danger: "bg-danger text-white hover:brightness-110",
+    danger: "bg-danger text-white hover:brightness-110 shadow-md shadow-danger/20",
   }[variant];
-  const s = { sm: "h-8 px-3 text-xs", md: "h-10 px-4 text-sm", lg: "h-12 px-6 text-base" }[size];
+  const s = { sm: "h-9 px-3 text-xs", md: "h-11 px-4 text-[15px]", lg: "h-12 px-6 text-base" }[size];
   return (
-    <button className={cx("inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-[filter,background-color,transform] duration-150 active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none", v, s, className)} {...p}>
+    <button className={cx("inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-150 active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none", v, s, className)} {...p}>
       {children}
     </button>
   );
 }
 
-export const inputCls = "flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/60";
+export const inputCls = "flex h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-[15px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary/60";
 
 export function Field({ label, help, children, className }) {
   return (
     <label className={cx("block space-y-1.5", className)}>
-      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       {children}
-      {help && <span className="block text-xs text-muted-foreground">{help}</span>}
+      {help && <span className="block text-[12px] text-muted-foreground">{help}</span>}
     </label>
   );
 }
@@ -43,20 +43,24 @@ export function Select({ options, className, placeholder, ...p }) {
   );
 }
 
-export function Toggle({ checked, onChange, label, ...p }) {
+export function Toggle({ checked = false, onChange, label, className, switchClassName, disabled = false, ...p }) {
+  const isOn = checked === true;
   return (
-    <label className="inline-flex cursor-pointer items-center gap-3 text-sm">
-      <button type="button" role="switch" aria-checked={!!checked} onClick={() => onChange(!checked)}
-        className={cx("relative h-6 w-11 rounded-full transition-colors", checked ? "bg-primary" : "bg-border")} {...p}>
-        <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-5" : "translate-x-0.5")} />
+    <div className={cx("inline-flex min-w-0 items-center gap-2.5 text-sm", className)}>
+      <button type="button" role="switch" aria-label={label || p["aria-label"] || "Toggle setting"} aria-checked={isOn}
+        onClick={() => !disabled && onChange?.(!isOn)} disabled={disabled}
+        className={cx("group relative inline-flex h-6 w-11 flex-none items-center rounded-full border border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          isOn ? "bg-primary" : "bg-border", switchClassName)} {...p}>
+        <span className={cx("pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200 ease-in-out",
+          isOn ? "translate-x-5" : "translate-x-0")} />
       </button>
-      {label}
-    </label>
+      {label && <span className="min-w-0 select-none leading-5 text-foreground" onClick={() => !disabled && onChange?.(!isOn)}>{label}</span>}
+    </div>
   );
 }
 
 export function Card({ className, children, ...p }) {
-  return <div className={cx("rounded-lg border border-border bg-card", className)} {...p}>{children}</div>;
+  return <div className={cx("rounded-2xl border border-border bg-card shadow-[0_8px_30px_rgba(15,23,42,0.04)]", className)} {...p}>{children}</div>;
 }
 
 const tones = {
@@ -107,8 +111,8 @@ export function PageHeader({ title, subtitle, actions, eyebrow }) {
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4 animate-rise">
       <div>
         {eyebrow && <div className="mb-1 font-mono text-[11px] uppercase tracking-[.2em] text-primary">{eyebrow}</div>}
-        <h1 className="text-3xl font-bold">{title}</h1>
-        {subtitle && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
+        <h1 className="text-[2rem] font-bold leading-tight text-foreground sm:text-[2.2rem]">{title}</h1>
+        {subtitle && <p className="mt-2 max-w-2xl text-[15px] leading-6 text-muted-foreground">{subtitle}</p>}
       </div>
       <div className="flex flex-wrap gap-2">{actions}</div>
     </div>

@@ -45,12 +45,25 @@ async def get_ctx(request: Request, user: dict = Depends(current_user)) -> Ctx:
             raise HTTPException(403, "You are not a member of this organisation")
         return Ctx(user=user, org_id=None, role=None, is_super=user.get("is_super_admin", False))
     request.state.org_id = m["organisation_id"]
-    return Ctx(user=user, org_id=m["organisation_id"], role=m["role"], caps=set(ROLES[m["role"]]["caps"]),
+    role = m["role"]
+    caps = set(ROLES.get(role, {}).get("caps", set()))
+    if isinstance(m.get("capabilities"), list) and m["capabilities"]:
+        caps = {str(cap) for cap in m["capabilities"] if cap}
+    elif role not in ROLES:
+        org = await db.organisations.find_one({"id": m["organisation_id"]}, {"settings": 1, "_id": 0})
+        custom_roles = ((org or {}).get("settings") or {}).get("custom_roles") or []
+        for custom in custom_roles:
+            if str(custom.get("key") or custom.get("name") or "") == role:
+                caps = {str(cap) for cap in custom.get("capabilities", []) if cap}
+                break
+    return Ctx(user=user, org_id=m["organisation_id"], role=role, caps=caps,
                is_super=user.get("is_super_admin", False))
 
 
 def need(cap: str):
     async def dep(ctx: Ctx = Depends(get_ctx)) -> Ctx:
+        if ctx.is_super:
+            return ctx
         if not ctx.org_id or not ctx.can(cap):
             raise HTTPException(403, "You do not have permission for this action")
         return ctx

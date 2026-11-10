@@ -52,8 +52,55 @@ async def m0004_tenant_b():
         await create_org("Demo Tenant B Architects", "admin@tenantb-demo.com", "TenantB@2026", "Tenant B Admin", slug="tenant-b")
 
 
+async def m0005_enable_specification_comparison():
+    template = await db.estimate_templates.find_one({"source_file": "Quotation Of Aniket Deotale ji sir (1).pdf"}, {"_id": 0, "id": 1})
+    if template:
+        await db.line_items.update_many(
+            {"template_id": template["id"], "code": {"$regex": r"^SPEC-"}, "status": "active"},
+            {"$set": {"client_can_change_option": True}},
+        )
+
+
+async def m0006_align_quotation_floor_default():
+    template = await db.estimate_templates.find_one(
+        {"source_file": "Quotation Of Aniket Deotale ji sir (1).pdf"}, {"_id": 0, "id": 1}
+    )
+    if not template:
+        return
+    floor_input = await db.input_definitions.find_one(
+        {"template_id": template["id"], "key": "total_floors", "status": "active"}, {"_id": 0, "id": 1, "default_value": 1}
+    )
+    if not floor_input or str(floor_input.get("default_value")) != "3":
+        return
+    foundation = await db.foundation_rule_sets.find_one(
+        {"template_id": template["id"], "line_item_id": {"$exists": True}, "status": "active"}, {"_id": 0, "bands": 1}
+    )
+    has_g_plus_3_band = any(
+        str(band.get("min_floors")) == "4" and str(band.get("max_floors")) == "4"
+        for band in (foundation or {}).get("bands", [])
+    )
+    if has_g_plus_3_band:
+        await db.input_definitions.update_one(
+            {"id": floor_input["id"]}, {"$set": {"default_value": "4", "updated_at": now()}}
+        )
+
+
+async def m0007_enable_turnkey_price_comparison():
+    template = await db.estimate_templates.find_one(
+        {"source_file": "Quotation Of Aniket Deotale ji sir (1).pdf"}, {"_id": 0, "id": 1}
+    )
+    if template:
+        await db.line_items.update_many(
+            {"template_id": template["id"], "code": {"$regex": r"^(SPEC|FIN)-"}, "status": "active"},
+            {"$set": {"client_can_change_option": True}},
+        )
+
+
 MIGRATIONS = [("0001_indexes", m0001_indexes), ("0002_platform_seed", m0002_platform_seed),
-              ("0003_quotation_import", m0003_quotation_import), ("0004_tenant_b", m0004_tenant_b)]
+              ("0003_quotation_import", m0003_quotation_import), ("0004_tenant_b", m0004_tenant_b),
+              ("0005_enable_specification_comparison", m0005_enable_specification_comparison),
+              ("0006_align_quotation_floor_default", m0006_align_quotation_floor_default),
+              ("0007_enable_turnkey_price_comparison", m0007_enable_turnkey_price_comparison)]
 
 
 async def run_migrations():

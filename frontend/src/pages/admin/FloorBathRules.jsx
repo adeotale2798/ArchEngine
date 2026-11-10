@@ -23,7 +23,7 @@ export function SlabRules() {
         columns={[["name", "Name", (r) => <b>{r.name}</b>], ["quantity_basis", "Basis", (r) => <Badge tone="info">{r.quantity_basis}</Badge>],
           ["formula", "Quantity", (r) => <span className="num text-xs">({r.input_key || "total_floors"} {r.floor_adjustment ? `${Number(r.floor_adjustment) < 0 ? "" : "+"}${r.floor_adjustment}` : ""}) × {r.slabs_per_floor || 1}{["AREA", "VOLUME"].includes(r.quantity_basis) ? ` × ${r.quantity_per_floor}` : ""}</span>],
           ["is_assumption", "Assumption", (r) => (r.is_assumption ? "yes" : "no")], ["status", "Status", statusBadge]]} />}
-      <RulePreview inputKey="total_floors" lineIds={sets.rows.map((s) => s.line_item_id)} title="Floor change simulator — slabs" />
+      <RulePreview inputKey="total_floors" lineIds={sets.rows.map((s) => s.line_item_id)} title="Floor change simulator — Slabs" />
     </div>
   );
 }
